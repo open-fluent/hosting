@@ -40,6 +40,58 @@ public sealed class HostedServiceTests
     }
 
     [Fact]
+    public void AddHostedServiceThrowsWhenActionIsNull()
+    {
+        ServiceCollection services = [];
+        Func<IServiceProvider, Task> action = null!;
+
+        ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
+            services.AddHostedService(action)
+        );
+
+        exception.ParamName.Should().Be(nameof(action));
+    }
+
+    [Fact]
+    public void AddHostedServiceThrowsWhenTokenAwareActionIsNull()
+    {
+        ServiceCollection services = [];
+        Func<IServiceProvider, CancellationToken, Task> action = null!;
+
+        ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
+            services.AddHostedService(action)
+        );
+
+        exception.ParamName.Should().Be(nameof(action));
+    }
+
+    [Fact]
+    public void AddHostedServiceOfTThrowsWhenActionIsNull()
+    {
+        ServiceCollection services = [];
+        Func<ServiceMarker, Task> action = null!;
+
+        ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
+            services.AddHostedService(action)
+        );
+
+        exception.ParamName.Should().Be(nameof(action));
+    }
+
+    [Fact]
+    public void AddHostedServiceOfTThrowsWhenTokenAwareActionIsNull()
+    {
+        ServiceCollection services = [];
+        Func<ServiceMarker, CancellationToken, Task> action = null!;
+
+        ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
+            services.AddHostedService(action)
+        );
+
+        exception.ParamName.Should().Be(nameof(action));
+    }
+
+    [Fact]
     public async Task StartAsyncRunsRegisteredHostedService()
     {
         HostApplicationBuilder builder = Host.CreateApplicationBuilder();
@@ -70,6 +122,102 @@ public sealed class HostedServiceTests
     }
 
     [Fact]
+    public async Task StartAsyncRunsRegisteredHostedServiceWithResolvedService()
+    {
+        HostApplicationBuilder builder = Host.CreateApplicationBuilder();
+        ServiceMarker marker = new();
+
+        builder.Services.AddSingleton(marker);
+
+        ServiceMarker? resolvedMarker = null;
+        var runCount = 0;
+
+        builder.Services.AddHostedService<ServiceMarker>(service =>
+        {
+            resolvedMarker = service;
+            runCount++;
+
+            return Task.CompletedTask;
+        });
+
+        using IHost host = builder.Build();
+
+        await host.StartAsync();
+
+        runCount.Should().Be(1);
+        resolvedMarker.Should().BeSameAs(marker);
+    }
+
+    [Fact]
+    public async Task StartAsyncPassesCancellationTokenToRegisteredHostedService()
+    {
+        ServiceCollection services = [];
+        using CancellationTokenSource cancellationTokenSource = new();
+        CancellationToken? capturedCancellationToken = null;
+
+        services.AddHostedService(
+            (_, cancellationToken) =>
+            {
+                capturedCancellationToken = cancellationToken;
+
+                return Task.CompletedTask;
+            }
+        );
+
+        await using ServiceProvider serviceProvider = services.BuildServiceProvider();
+
+        IHostedService service = serviceProvider.GetRequiredService<IHostedService>();
+
+        await service.StartAsync(cancellationTokenSource.Token);
+
+        capturedCancellationToken.Should().Be(cancellationTokenSource.Token);
+    }
+
+    [Fact]
+    public async Task StartAsyncPassesResolvedServiceAndCancellationTokenToRegisteredHostedService()
+    {
+        ServiceMarker marker = new();
+        ServiceCollection services = [];
+        using CancellationTokenSource cancellationTokenSource = new();
+        ServiceMarker? resolvedMarker = null;
+        CancellationToken? capturedCancellationToken = null;
+
+        services.AddSingleton(marker);
+        services.AddHostedService<ServiceMarker>(
+            (service, cancellationToken) =>
+            {
+                resolvedMarker = service;
+                capturedCancellationToken = cancellationToken;
+
+                return Task.CompletedTask;
+            }
+        );
+
+        await using ServiceProvider serviceProvider = services.BuildServiceProvider();
+
+        IHostedService service = serviceProvider.GetRequiredService<IHostedService>();
+
+        await service.StartAsync(cancellationTokenSource.Token);
+
+        resolvedMarker.Should().BeSameAs(marker);
+        capturedCancellationToken.Should().Be(cancellationTokenSource.Token);
+    }
+
+    [Fact]
+    public async Task StartAsyncThrowsWhenResolvedHostedServiceDependencyIsMissing()
+    {
+        ServiceCollection services = [];
+
+        services.AddHostedService<ServiceMarker>(_ => Task.CompletedTask);
+
+        await using ServiceProvider serviceProvider = services.BuildServiceProvider();
+
+        IHostedService service = serviceProvider.GetRequiredService<IHostedService>();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.StartAsync(CancellationToken.None));
+    }
+
+    [Fact]
     public async Task StartAsyncRunsAllSubsequentHostedServiceRegistrationsWithDifferentActions()
     {
         HostApplicationBuilder builder = Host.CreateApplicationBuilder();
@@ -83,6 +231,36 @@ public sealed class HostedServiceTests
         });
         builder.Services.AddHostedService(_ =>
         {
+            calls.Add("second");
+
+            return Task.CompletedTask;
+        });
+
+        using IHost host = builder.Build();
+
+        await host.StartAsync();
+
+        calls.Should().Equal("first", "second");
+    }
+
+    [Fact]
+    public async Task StartAsyncRunsAllSubsequentTypedHostedServiceRegistrationsWithDifferentActions()
+    {
+        HostApplicationBuilder builder = Host.CreateApplicationBuilder();
+        ServiceMarker marker = new();
+        List<string> calls = [];
+
+        builder.Services.AddSingleton(marker);
+        builder.Services.AddHostedService<ServiceMarker>(service =>
+        {
+            service.Should().BeSameAs(marker);
+            calls.Add("first");
+
+            return Task.CompletedTask;
+        });
+        builder.Services.AddHostedService<ServiceMarker>(service =>
+        {
+            service.Should().BeSameAs(marker);
             calls.Add("second");
 
             return Task.CompletedTask;
@@ -126,6 +304,25 @@ public sealed class HostedServiceTests
         await startTask.WaitAsync(TimeSpan.FromSeconds(5));
 
         completed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task StartAsyncPropagatesHostedServiceException()
+    {
+        ServiceCollection services = [];
+        InvalidOperationException expectedException = new("Hosted service failed.");
+
+        services.AddHostedService(_ => throw expectedException);
+
+        await using ServiceProvider serviceProvider = services.BuildServiceProvider();
+
+        IHostedService service = serviceProvider.GetRequiredService<IHostedService>();
+
+        InvalidOperationException actualException = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.StartAsync(CancellationToken.None)
+        );
+
+        actualException.Should().BeSameAs(expectedException);
     }
 
     [Fact]

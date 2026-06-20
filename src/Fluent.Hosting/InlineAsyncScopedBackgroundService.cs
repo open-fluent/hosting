@@ -12,14 +12,25 @@ namespace Fluent.Hosting;
 /// <param name="action">The asynchronous delegate to run in the background.</param>
 public class InlineAsyncScopedBackgroundService(
     IServiceScopeFactory scopeFactory,
-    Func<IServiceProvider, Task> action
+    Func<IServiceProvider, CancellationToken, Task> action
 ) : BackgroundService
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="InlineAsyncScopedBackgroundService" /> class.
+    /// </summary>
+    /// <param name="scopeFactory">The factory used to create the scope passed to the asynchronous delegate.</param>
+    /// <param name="action">The asynchronous delegate to run in the background.</param>
+    public InlineAsyncScopedBackgroundService(
+        IServiceScopeFactory scopeFactory,
+        Func<IServiceProvider, Task> action
+    )
+        : this(scopeFactory, (serviceProvider, _) => action(serviceProvider)) { }
+
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using IServiceScope scope = scopeFactory.CreateScope();
 
-        await action(scope.ServiceProvider);
+        await action(scope.ServiceProvider, stoppingToken);
     }
 }

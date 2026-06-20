@@ -10,11 +10,22 @@ namespace Fluent.Hosting;
 /// </summary>
 /// <param name="services">The service provider passed to the asynchronous delegate.</param>
 /// <param name="action">The asynchronous delegate to run when the service starts.</param>
-public class InlineAsyncHostedService(IServiceProvider services, Func<IServiceProvider, Task> action)
-    : IHostedService
+public class InlineAsyncHostedService(
+    IServiceProvider services,
+    Func<IServiceProvider, CancellationToken, Task> action
+) : IHostedService
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="InlineAsyncHostedService" /> class.
+    /// </summary>
+    /// <param name="services">The service provider passed to the asynchronous delegate.</param>
+    /// <param name="action">The asynchronous delegate to run when the service starts.</param>
+    public InlineAsyncHostedService(IServiceProvider services, Func<IServiceProvider, Task> action)
+        : this(services, (serviceProvider, _) => action(serviceProvider)) { }
+
     /// <inheritdoc />
-    public virtual Task StartAsync(CancellationToken cancellationToken) => action(services);
+    public virtual Task StartAsync(CancellationToken cancellationToken) =>
+        action(services, cancellationToken);
 
     /// <inheritdoc />
     public virtual Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

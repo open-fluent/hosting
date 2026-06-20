@@ -3,7 +3,7 @@
     <TargetFrameworks>net10.0;net8.0;net472;net481</TargetFrameworks>
     <Product>Fluent.Hosting</Product>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <PackageTags>http;Hosting</PackageTags>
+    <PackageTags>http;hosting;extensions;dependency;injection;abstractions;fluent;api;aspnet;web;api</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

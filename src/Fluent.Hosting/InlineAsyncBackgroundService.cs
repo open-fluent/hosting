@@ -10,9 +10,19 @@ namespace Fluent.Hosting;
 /// </summary>
 /// <param name="services">The service provider passed to the asynchronous delegate.</param>
 /// <param name="action">The asynchronous delegate to run in the background.</param>
-public class InlineAsyncBackgroundService(IServiceProvider services, Func<IServiceProvider, Task> action)
-    : BackgroundService
+public class InlineAsyncBackgroundService(
+    IServiceProvider services,
+    Func<IServiceProvider, CancellationToken, Task> action
+) : BackgroundService
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="InlineAsyncBackgroundService" /> class.
+    /// </summary>
+    /// <param name="services">The service provider passed to the asynchronous delegate.</param>
+    /// <param name="action">The asynchronous delegate to run in the background.</param>
+    public InlineAsyncBackgroundService(IServiceProvider services, Func<IServiceProvider, Task> action)
+        : this(services, (serviceProvider, _) => action(serviceProvider)) { }
+
     /// <inheritdoc />
-    protected override Task ExecuteAsync(CancellationToken stoppingToken) => action(services);
+    protected override Task ExecuteAsync(CancellationToken stoppingToken) => action(services, stoppingToken);
 }

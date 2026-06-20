@@ -12,15 +12,26 @@ namespace Fluent.Hosting;
 /// <param name="action">The asynchronous delegate to run when the service starts.</param>
 public class InlineAsyncScopedHostedService(
     IServiceScopeFactory scopeFactory,
-    Func<IServiceProvider, Task> action
+    Func<IServiceProvider, CancellationToken, Task> action
 ) : IHostedService
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="InlineAsyncScopedHostedService" /> class.
+    /// </summary>
+    /// <param name="scopeFactory">The factory used to create the scope passed to the asynchronous delegate.</param>
+    /// <param name="action">The asynchronous delegate to run when the service starts.</param>
+    public InlineAsyncScopedHostedService(
+        IServiceScopeFactory scopeFactory,
+        Func<IServiceProvider, Task> action
+    )
+        : this(scopeFactory, (serviceProvider, _) => action(serviceProvider)) { }
+
     /// <inheritdoc />
     public virtual async Task StartAsync(CancellationToken cancellationToken)
     {
         using IServiceScope? scope = scopeFactory.CreateScope();
 
-        await action(scope.ServiceProvider);
+        await action(scope.ServiceProvider, cancellationToken);
     }
 
     /// <inheritdoc />
