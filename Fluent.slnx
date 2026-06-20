@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="Directory.Packages.props" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="tests/Fluent.Hosting.UnitTests/Fluent.Hosting.UnitTests.csproj" />
+  </Folder>
+  <Project Path="src/Fluent.Hosting/Fluent.Hosting.csproj" />
+</Solution>
